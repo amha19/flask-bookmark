@@ -1,18 +1,26 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash
-from src.db import User, db
-from src.constants.http_status_codes import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_409_CONFLICT
 import validators
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required
+from werkzeug.security import check_password_hash
+from src.db import User, db
+from src.constants.http_status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_409_CONFLICT
 
 auth = Blueprint("auth", __name__, url_prefix="/api/v1/auth")
+
+
+@auth.route('/reg', methods=['POST'])  # alternative way
+def to_check():
+    username = request.json['username']
+    un = request.json.get('username', '')
+    return jsonify({'msg': 'ok'}), 200
 
 
 @auth.post('/register')
 def register():
     username = request.get_json()['username']
     email = request.get_json()['email']
-    password = request.get_json()['password']
-    # print(password)
+    password = request.json['password']
 
     if not username.isalnum() or " " in username:
         return jsonify({
@@ -47,6 +55,7 @@ def register():
         })
 
     user = User(username=username, email=email, password=pwd_hash)
+
     db.session.add(user)
     db.session.commit()
 
@@ -59,6 +68,38 @@ def register():
     }), HTTP_201_CREATED
 
 
+@auth.post('/login')
+def login():
+    email = request.json.get('email', None)
+    password = request.json.get('password', None)
+
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        is_pass_corect = check_password_hash(user.password, password)
+        if not is_pass_corect:
+            return jsonify({
+                'message': 'Invalid username or password'
+            }), HTTP_401_UNAUTHORIZED
+        else:
+            access = create_access_token(identity=user.id)
+            refresh = create_refresh_token(identity=user.id)
+
+            return jsonify({
+                'user': {
+                    'username': user.username,
+                    'email': user.email,
+                    'access_token': access,
+                    'refresh_token': refresh
+                }
+            }), HTTP_200_OK
+
+    return jsonify({
+        'error': 'Wrong credentials'
+    }), HTTP_401_UNAUTHORIZED
+
+
 @auth.get('/')
+@jwt_required()
 def index():
     return {"message": "done"}
