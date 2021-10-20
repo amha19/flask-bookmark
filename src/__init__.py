@@ -1,5 +1,8 @@
 from flask import Flask
 import os
+from src.bookmark import bookmark
+from src.auth import auth
+from src.db import db
 
 
 def create_app(test_config=None):
@@ -8,18 +11,16 @@ def create_app(test_config=None):
 
     if test_config is None:
         app.config.from_mapping(
-            SECRET_KEY=os.environ['SECRET_KEY'],
+            SECRET_KEY=os.environ.get('SECRET_KEY'),
+            SQLALCHEMY_DB_URI=os.environ.get('SQLALCHEMY_DB_URI')
         )
     else:
         # load the test config if passed in
         app.config.from_mapping(test_config)
 
-    @app.route('/')
-    def index():
-        return 'Hello, World!'
-
-    @app.route('/hello')
-    def say_hello():
-        return {'message': 'Hello Flask!'}
+    db.app = app
+    db.init_app(app)
+    app.register_blueprint(auth)
+    app.register_blueprint(bookmark)
 
     return app
