@@ -1,7 +1,8 @@
+from datetime import timedelta
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash
 import validators
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash
 from src.db import User, db
 from src.constants.http_status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_409_CONFLICT
@@ -82,7 +83,8 @@ def login():
                 'message': 'Invalid username or password'
             }), HTTP_401_UNAUTHORIZED
         else:
-            access = create_access_token(identity=user.id)
+            access = create_access_token(
+                identity=user.id, expires_delta=timedelta(minutes=15))  # default expiration time
             refresh = create_refresh_token(identity=user.id)
 
             return jsonify({
@@ -99,7 +101,28 @@ def login():
     }), HTTP_401_UNAUTHORIZED
 
 
-@auth.get('/')
+@auth.get('/me')
 @jwt_required()
-def index():
-    return {"message": "done"}
+def me():
+    user_id = get_jwt_identity()
+
+    user = User.query.filter_by(id=user_id).first()
+    # no need to check if user exist because it will
+    # to this point if it has jwt token.
+
+    return jsonify({
+        'username': user.username,
+        'email': user.email
+    }), HTTP_200_OK
+
+
+@auth.get('/token/refresh')
+@jwt_required(refresh=True)
+def refresh_user_token():
+    identity = get_jwt_identity()
+
+    access = create_access_token(identity=identity)
+
+    return jsonify({
+        'access': access,
+    }), HTTP_200_OK
