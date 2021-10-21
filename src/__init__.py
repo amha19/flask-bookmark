@@ -1,9 +1,11 @@
-from flask import Flask
+from flask import Flask, redirect, jsonify
 import os
 from flask_jwt_extended import JWTManager
+import werkzeug
 from src.bookmark import bookmark
 from src.auth import auth
-from src.db import db
+from src.constants.http_status_codes import HTTP_404_NOT_FOUND, HTTP_500_INTERNAL_SERVER_ERROR
+from src.db import Bookmark, db
 
 # from dotenv import load_dotenv
 
@@ -32,5 +34,26 @@ def create_app(test_config=None):
     db.init_app(app)
     app.register_blueprint(auth)
     app.register_blueprint(bookmark)
+
+    @app.get('/<short_url>')
+    def redirect_to_url(short_url):
+
+        bookmark = Bookmark.query.filter_by(short_url=short_url).first_or_404()
+
+        if bookmark:
+            bookmark.visits += 1
+            db.session.commit()
+
+        return redirect(bookmark.url)
+
+    @app.errorhandler(werkzeug.exceptions.NotFound)
+    def handle_bad_request(e):
+        return jsonify({
+            'message': 'Page not found'
+        }), HTTP_404_NOT_FOUND
+
+    @app.errorhandler(werkzeug.exceptions.InternalServerError)
+    def handle_internal_server_error():
+        return 'Something went wrong with the internal server', HTTP_500_INTERNAL_SERVER_ERROR
 
     return app

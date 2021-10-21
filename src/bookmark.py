@@ -163,3 +163,25 @@ def update_bookmark(bm_id):
             'updated_at': bookmark.updated_at,
         }
     }), HTTP_200_OK
+
+
+@bookmark.get('/stats')
+@jwt_required()
+def get_bookmark_stat():
+    current_user = get_jwt_identity()
+
+    bookmarks = Bookmark.query.filter_by(user_id=current_user)
+
+    data = []
+
+    for bookmark in bookmarks:
+        data.append({
+            'id': bookmark.id,
+            'visits': bookmark.visits,
+            'short_url': bookmark.short_url,
+            'url': bookmark.url
+        })
+
+    return jsonify({
+        'bookmarks_stats': data
+    }), HTTP_200_OK
