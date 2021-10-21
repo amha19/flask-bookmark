@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended.utils import get_jwt_identity
 from flask_jwt_extended.view_decorators import jwt_required
 import validators
-from src.constants.http_status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_409_CONFLICT
+from src.constants.http_status_codes import HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_409_CONFLICT
 
 from src.db import Bookmark, db
 
@@ -18,7 +18,7 @@ def handle_bookmarks():
         body = request.json.get('body', '')
         url = request.json.get('url', '')
 
-        if Bookmark.query.filter_by(url=url).first():
+        if Bookmark.query.filter_by(url=url, user_id=current_user).first():
             return jsonify({
                 'message': 'url already exist'
             }), HTTP_409_CONFLICT
@@ -66,6 +66,7 @@ def handle_bookmarks():
 
         for bookmark in bookmarks.items:
             data.append({
+                'id': bookmark.id,
                 'body': bookmark.body,
                 'url': bookmark.url,
                 'short_url': bookmark.short_url,
@@ -100,3 +101,65 @@ def get_bookmark_by_id(bm_id):
         'created_at': bookmark.created_at,
         'updated_at': bookmark.updated_at,
     })
+
+
+@bookmark.delete('/<int:bm_id>')
+@jwt_required()
+def delete_bookmark_by_id(bm_id):
+    current_user = get_jwt_identity()
+
+    bookmark = Bookmark.query.filter_by(user_id=current_user, id=bm_id).first()
+
+    if not bookmark:
+        return jsonify({
+            'message': 'Bookmark not found'
+        }), HTTP_404_NOT_FOUND
+
+    db.session.delete(bookmark)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Bookmark deleted'
+    }), HTTP_204_NO_CONTENT
+
+
+@bookmark.put('/<int:bm_id>')
+@jwt_required()
+def update_bookmark(bm_id):
+    current_user = get_jwt_identity()
+
+    body = request.json.get('body', '')
+    url = request.json.get('url', '')
+    bookmark = Bookmark.query.filter_by(id=bm_id, user_id=current_user).first()
+
+    if not bookmark:
+        return jsonify({
+            'message': 'Bookmark not found'
+        }), HTTP_404_NOT_FOUND
+
+    if Bookmark.query.filter_by(url=url, user_id=current_user).first():
+        return jsonify({
+            'message': 'url already exist'
+        }), HTTP_409_CONFLICT
+
+    if not validators.url(url):
+        return jsonify({
+            'error': 'Enter valid url'
+        }), HTTP_400_BAD_REQUEST
+
+    bookmark.url = url
+    bookmark.body = body
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Bookmark updated',
+        'bookmark': {
+            'id': bookmark.id,
+            'body': bookmark.body,
+            'url': bookmark.url,
+            'short_url': bookmark.short_url,
+            'visits': bookmark.visits,
+            'created_at': bookmark.created_at,
+            'updated_at': bookmark.updated_at,
+        }
+    }), HTTP_200_OK
