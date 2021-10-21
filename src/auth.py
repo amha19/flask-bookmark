@@ -84,7 +84,8 @@ def login():
             }), HTTP_401_UNAUTHORIZED
         else:
             access = create_access_token(
-                identity=user.id, expires_delta=timedelta(minutes=15))  # default expiration time
+                # default expiration time is 15mins
+                identity=user.id, expires_delta=timedelta(hours=8))
             refresh = create_refresh_token(identity=user.id)
 
             return jsonify({
