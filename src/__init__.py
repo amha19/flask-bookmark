@@ -2,6 +2,7 @@ from flask import Flask, redirect, jsonify
 import os
 from flask_jwt_extended import JWTManager
 import werkzeug
+from flask_cors import CORS
 from src.bookmark import bookmark
 from src.auth import auth
 from src.constants.http_status_codes import HTTP_404_NOT_FOUND, HTTP_500_INTERNAL_SERVER_ERROR
@@ -16,6 +17,7 @@ def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
 
+    CORS(app)
     # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bookmark.db'
 
     if test_config is None:
